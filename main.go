@@ -14,6 +14,7 @@ const (
 	HomeDir     LookupPlace = "Home"
 	UserConfig  LookupPlace = ".config"
 	CurrentPath LookupPlace = "./"
+	Etc         LookupPlace = "/etc"
 )
 
 type SearchPlaces []LookupPlace
@@ -48,6 +49,16 @@ func (s *ConfigFileSelector) AddLookupPlace(place LookupPlace) {
 		}
 	}
 	s.lookupPlacesFlags = append(s.lookupPlacesFlags, place)
+}
+
+/* Add /etc/ path */
+func (s *ConfigFileSelector) UseEtc() {
+	s.lookupPlacesFlags = append(s.lookupPlacesFlags, Etc)
+}
+
+/* Add /etc/<program name>/ path */
+func (s *ConfigFileSelector) UseEtcProgramFolder(programName string) {
+	s.lookupPlacesFlags = append(s.lookupPlacesFlags, LookupPlace(filepath.Join("/etc", programName)))
 }
 
 /* Get well-known path list for searching config file's

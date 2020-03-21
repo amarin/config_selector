@@ -103,3 +103,45 @@ func TestConfigFileSelector_LookupFolderList(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigFileSelector_UseEtc(t *testing.T) {
+	fakeFilename := "test.config"
+	s := NewConfigFileSelector(fakeFilename)
+	s.UseEtc()
+	if knownDirList, err := s.LookupFolderList(); err != nil {
+		t.Fatalf("LookupFolderList() unexpected error = %v", err)
+	} else if knownDirList == nil {
+		t.Fatalf("LookupFolderList() unexpected result %v with error %v", knownDirList, err)
+	} else if len(*knownDirList) == 0 {
+		t.Fatalf("LookupFolderList() unexpected empty result while expects /etc with error %v", err)
+	} else {
+		for _, knownDir := range *knownDirList {
+			if knownDir != "/etc" {
+				t.Fatalf("LookupFolderList() got %v instead /etc while use UseEtc", knownDir)
+			}
+			break
+		}
+	}
+}
+
+func TestConfigFileSelector_UseEtcProgramFolder(t *testing.T) {
+	fakeFilename := "test.config"
+	fakeProgramName := "anyName"
+	expectedPath := filepath.Join("/etc", fakeProgramName)
+	s := NewConfigFileSelector(fakeFilename)
+	s.UseEtcProgramFolder(fakeProgramName)
+	if knownDirList, err := s.LookupFolderList(); err != nil {
+		t.Fatalf("LookupFolderList() unexpected error = %v", err)
+	} else if knownDirList == nil {
+		t.Fatalf("LookupFolderList() unexpected result %v with error %v", knownDirList, err)
+	} else if len(*knownDirList) == 0 {
+		t.Fatalf("LookupFolderList() unexpected empty result while expects /etc with error %v", err)
+	} else {
+		for _, knownDir := range *knownDirList {
+			if knownDir != expectedPath {
+				t.Fatalf("LookupFolderList() got %v instead %v while use UseEtcProgramFolder", knownDir, expectedPath)
+			}
+			break
+		}
+	}
+}
