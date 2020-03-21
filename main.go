@@ -31,7 +31,7 @@ func (s *ConfigFileSelector) String() string {
 	return fmt.Sprintf("ConfigFileSelector{%v, [%v]}", s.filename, strings.Join(placesStr, ","))
 }
 
-/* Make new configuration loader for required filename using search places flags */
+/* Make new configuration loader for required lookup using search places flags */
 func NewConfigFileSelector(fileName string, a ...LookupPlace) *ConfigFileSelector {
 	lookupPlaces := SearchPlaces{}
 	for _, plc := range a {
@@ -76,7 +76,14 @@ func (s *ConfigFileSelector) LookupFolderList() (*[]string, error) {
 					lookupPlaces = append(lookupPlaces, absPath)
 				}
 			}
+		default:
+			if absPath, err := filepath.Abs(string(placeKey)); err != nil {
+				return nil, err
+			} else {
+				lookupPlaces = append(lookupPlaces, absPath)
+			}
 		}
+
 	}
 	return &lookupPlaces, nil
 }
