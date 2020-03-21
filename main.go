@@ -8,66 +8,99 @@ import (
 	"strings"
 )
 
+// LookupPlace type is just a string
 type LookupPlace string
 
+// Some lookup places predefined.
+// Constant lookup places has special meanings which actual path calculated runtime.
+// All others will threat as relative or absolute path
 const (
-	HomeDir     LookupPlace = "Home"
-	UserConfig  LookupPlace = ".config"
+	// Home is a platform dependent user home folder. Actual place detected runtime
+	HomeDir LookupPlace = "Home"
+	// UserConfig dir is a platform dependent user configuration path. Actual place detected runtime
+	UserConfig LookupPlace = ".config"
+	// Current work dir
 	CurrentPath LookupPlace = "./"
-	Etc         LookupPlace = "/etc"
+	// Posix platforms /etc/
+	Etc LookupPlace = "/etc"
 )
 
-type SearchPlaces []LookupPlace
+// Lookup places stored together in simple slice
+type LookupPlacesList []LookupPlace
 
-type ConfigFileSelector struct {
-	filename          string
-	lookupPlacesFlags SearchPlaces
-}
-
-func (s *ConfigFileSelector) String() string {
+// LookupPlacesList has it's own String method, it useful to output lookup places list, separated by comma's
+func (s *LookupPlacesList) String() string {
 	var placesStr []string
-	for _, p := range s.lookupPlacesFlags {
+	for _, p := range *s {
 		placesStr = append(placesStr, string(p))
 	}
-	return fmt.Sprintf("ConfigFileSelector{%v, [%v]}", s.filename, strings.Join(placesStr, ","))
+	return strings.Join(placesStr, ", ")
 }
 
-/* Make new configuration loader for required lookup using search places flags */
+// ConfigFileSelector is an a helper object.
+// It provides some methods to easy find required configuration file specified by name
+// Literal form initialisation:
+//
+//   configSelector = &ConfigFileSelector{filename, LookupPlacesList{CurrentPath, HomeDir}}
+//
+// Additionally you can use NewConfigFileSelector constructor:
+//
+//   configSelector = NewConfigFileSelector(filename, CurrentPath, HomeDir)
+//
+type ConfigFileSelector struct {
+	filename         string
+	lookupPlacesList LookupPlacesList
+}
+
+// ConfigFileSelector instance implements Stringer interface:
+//
+// configSelector.String() == "ConfigFileSelector{filename.conf, [./, Home]}
+func (s *ConfigFileSelector) String() string {
+	return fmt.Sprintf("ConfigFileSelector{%v, [%v]}", s.filename, s.lookupPlacesList)
+}
+
+// Get lookup places keys list.
+// Useful to check some place is in list or to call configFileSelector.GetLookupPlaces().String()
+func (s *ConfigFileSelector) GetLookupPlaces() LookupPlacesList {
+	return s.lookupPlacesList
+}
+
+/* ConfigFileSelector constructor
+Allow to make new instance passing required filename and set of lookup places objects */
 func NewConfigFileSelector(fileName string, a ...LookupPlace) *ConfigFileSelector {
-	lookupPlaces := SearchPlaces{}
+	lookupPlaces := LookupPlacesList{}
 	for _, plc := range a {
 		lookupPlaces = append(lookupPlaces, plc)
 	}
 	return &ConfigFileSelector{fileName, lookupPlaces}
 }
 
-/* Add lookup place */
+// AddLookupPlace allow to add additional lookup place runtime
 func (s *ConfigFileSelector) AddLookupPlace(place LookupPlace) {
-	for _, p := range s.lookupPlacesFlags {
+	for _, p := range s.lookupPlacesList {
 		if p == place {
 			return
 		}
 	}
-	s.lookupPlacesFlags = append(s.lookupPlacesFlags, place)
+	s.lookupPlacesList = append(s.lookupPlacesList, place)
 }
 
-/* Add /etc/ path */
+// UseEtc adds /etc/ path to ConfigFileSelector lookup places list
 func (s *ConfigFileSelector) UseEtc() {
-	s.lookupPlacesFlags = append(s.lookupPlacesFlags, Etc)
+	s.lookupPlacesList = append(s.lookupPlacesList, Etc)
 }
 
-/* Add /etc/<program name>/ path */
+// UseEtcProgramFolder allow to add /etc/<program name>/ path to ConfigFileSelector lookup places list
 func (s *ConfigFileSelector) UseEtcProgramFolder(programName string) {
-	s.lookupPlacesFlags = append(s.lookupPlacesFlags, LookupPlace(filepath.Join("/etc", programName)))
+	s.lookupPlacesList = append(s.lookupPlacesList, LookupPlace(filepath.Join("/etc", programName)))
 }
 
-/* Get well-known path list for searching config file's
-
-Returns a list of well-known directories in order set by lookup flags
-*/
+// LookupFolderList just return list of absolute path string if such path exists.
+// All runtime calculated path are resolved here
+// Returns a list of well-known directories in order set by lookup flags and consequent additions
 func (s *ConfigFileSelector) LookupFolderList() (*[]string, error) {
 	var lookupPlaces []string
-	for _, placeKey := range s.lookupPlacesFlags {
+	for _, placeKey := range s.lookupPlacesList {
 		switch placeKey {
 		case UserConfig:
 			if userConfigDir, err := os.UserConfigDir(); err == nil {
@@ -136,7 +169,8 @@ func (s *ConfigFileSelector) SelectFirstKnownPlace() (*string, error) {
 	))
 }
 
-// Find configuration file in path or well known path list defined by lookup flags
+// Find configuration file in requested path first or in well known path list defined by lookup flags
+// return error if no such file found either in requested path or in well known path list
 func (s *ConfigFileSelector) SelectPath(path string) (*string, error) {
 	lookupPath := strings.Join([]string{path, s.filename}, string(os.PathSeparator))
 	if fileExists, err := s.IsFileExists(lookupPath); err == nil && fileExists == true {

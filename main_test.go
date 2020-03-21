@@ -14,7 +14,7 @@ func TestNewConfigFileSelectorWithNoLookups(t *testing.T) {
 	if rType != eType {
 		t.Fatalf("Expected NewConfigFileSelector()->%v, not %v", eType.Name(), rType.Name())
 	}
-	if len(s.lookupPlacesFlags) != 0 {
+	if len(s.lookupPlacesList) != 0 {
 		t.Fatalf("Unexpected lookup count with no lookups in constructor in %v", s)
 	}
 }
@@ -30,30 +30,30 @@ func TestNewConfigFileSelectorWithLookups(t *testing.T) {
 
 func TestConfigFileSelector_AddLookupPlace(t *testing.T) {
 	s := NewConfigFileSelector("exampleFilename")
-	if len(s.lookupPlacesFlags) != 0 {
+	if len(s.lookupPlacesList) != 0 {
 		t.Fatalf("Unexpected lookup count with no lookups in constructor in %v", s)
 	}
 	s.AddLookupPlace(UserConfig)
-	if len(s.lookupPlacesFlags) != 1 {
+	if len(s.lookupPlacesList) != 1 {
 		t.Fatalf("Unexpected lookup count after AddLookupPlace in %v", s)
 	}
 	s.AddLookupPlace(HomeDir)
-	if len(s.lookupPlacesFlags) != 2 {
+	if len(s.lookupPlacesList) != 2 {
 		t.Fatalf("Unexpected lookup count after AddLookupPlace in %v", s)
 	}
 }
 
 func TestConfigFileSelector_AddLookupPlace_Uniq(t *testing.T) {
 	s := NewConfigFileSelector("exampleFilename")
-	if len(s.lookupPlacesFlags) != 0 {
+	if len(s.lookupPlacesList) != 0 {
 		t.Fatalf("Unexpected lookup count with no lookups in constructor in %v", s)
 	}
 	s.AddLookupPlace(UserConfig)
-	if len(s.lookupPlacesFlags) != 1 {
+	if len(s.lookupPlacesList) != 1 {
 		t.Fatalf("Unexpected lookup count after AddLookupPlace in %v", s)
 	}
 	s.AddLookupPlace(UserConfig)
-	if len(s.lookupPlacesFlags) != 1 {
+	if len(s.lookupPlacesList) != 1 {
 		t.Fatalf("Unexpected lookup count after AddLookupPlace in %v", s)
 	}
 }
