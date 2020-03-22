@@ -158,15 +158,11 @@ func (s *ConfigFileSelector) SelectFirstKnownPlace() (*string, error) {
 	for _, checkPath := range *knownPathList {
 		if fileExists, err := s.IsFileExists(checkPath); err == nil && fileExists {
 			return &checkPath, nil
-		} else if err == nil && !fileExists {
-			return nil, err
 		} else {
-			return nil, err
+			continue
 		}
 	}
-	return nil, errors.New(fmt.Sprintf(
-		"No %v found in %v", s.filename, strings.Join(*knownPathList, ", "),
-	))
+	return nil, os.ErrNotExist
 }
 
 // Find configuration file in requested path first or in well known path list defined by lookup flags
