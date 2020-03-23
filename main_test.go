@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -415,5 +416,22 @@ func TestConfigFileSelector_GetLookupPlaces_String(t *testing.T) {
 				t.Errorf("String() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// Assert notFoundError contains missed file path message
+func TestConfigFileSelector_SelectFirstKnownPlace_NotFoundError(t *testing.T) {
+	s := &ConfigFileSelector{
+		filename:         "really.not.found.here.file.conf",
+		lookupPlacesList: LookupPlacesList{},
+	}
+	if _, err := s.SelectFirstKnownPlace(); err == nil {
+		t.Errorf("Expected SelectFirstKnownPlace() error while not found")
+		return
+	} else {
+		errMsg := fmt.Sprintf("%v", err)
+		if strings.Index(errMsg, s.filename) < 0 {
+			t.Errorf("No filename %v found in not found error %v", s.filename, errMsg)
+		}
 	}
 }

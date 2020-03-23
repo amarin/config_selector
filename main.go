@@ -1,6 +1,7 @@
 package config_selector
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -161,7 +162,7 @@ func (s *ConfigFileSelector) SelectFirstKnownPlace() (*string, error) {
 			continue
 		}
 	}
-	return nil, os.ErrNotExist
+	return nil, errors.New(fmt.Sprintf("File not found: %s, path are: %s", s.filename, s.lookupPlacesList))
 }
 
 // Find configuration file in requested absolute or relative path.
@@ -193,12 +194,15 @@ func (s *ConfigFileSelector) SelectPath(configPath string) (*string, error) {
 
 /* Check if file specified by full path is exists*/
 func (s *ConfigFileSelector) IsFileExists(path string) (bool, error) {
-	_, err := os.Stat(path)
+	fileInfo, err := os.Stat(path)
 	if err == nil {
 		return true, nil
 	}
 	if os.IsNotExist(err) {
 		return false, nil
+	}
+	if fileInfo.IsDir() {
+		return false, errors.New(fmt.Sprintf("Path %s is dir", path))
 	}
 	return true, err
 }
