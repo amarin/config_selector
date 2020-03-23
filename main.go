@@ -1,7 +1,6 @@
 package config_selector
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -56,7 +55,7 @@ type ConfigFileSelector struct {
 //
 // configSelector.String() == "ConfigFileSelector{filename.conf, [./, Home]}
 func (s *ConfigFileSelector) String() string {
-	return fmt.Sprintf("ConfigFileSelector{%v, [%v]}", s.filename, s.lookupPlacesList)
+	return fmt.Sprintf("ConfigFileSelector{%v, [%v]}", s.filename, s.lookupPlacesList.String())
 }
 
 // Get lookup places keys list.
@@ -166,19 +165,26 @@ func (s *ConfigFileSelector) SelectFirstKnownPlace() (*string, error) {
 }
 
 // Find configuration file in requested path first or in well known path list defined by lookup flags
-// return error if no such file found either in requested path or in well known path list
-func (s *ConfigFileSelector) SelectPath(path string) (*string, error) {
-	lookupPath := strings.Join([]string{path, s.filename}, string(os.PathSeparator))
-	if fileExists, err := s.IsFileExists(lookupPath); err == nil && fileExists == true {
-		return &lookupPath, nil
-	} else if err != nil {
-		// log lookup error
-		return s.SelectFirstKnownPlace()
-	} else if fileExists != true {
-		// log file not found
+// return error if no such file found either in requested path or in well known path list.
+// Possible variants:
+// - empty path requested: search set (default) filename in defined lookup places, return first existed or error
+// - filename requested: search specified filename in defined lookup places, return first existed or error
+// - absolute path requested: return it (if exists) otherwise return error
+func (s *ConfigFileSelector) SelectPath(configPath string) (*string, error) {
+	if configPath == "" {
+		// config path not set, looking for default
 		return s.SelectFirstKnownPlace()
 	}
-	return nil, os.ErrNotExist
+	if absConfigPath, err := filepath.Abs(configPath); err == nil && absConfigPath == configPath {
+		// take absolute path error, cant deal with that
+		if exists, err := s.IsFileExists(absConfigPath); err == nil && exists {
+			// absolute path ok, return it
+			return &absConfigPath, err // err==nil
+		}
+	}
+	// filename or relative path, search in defined lookup places but with specified name
+	s.filename = configPath
+	return s.SelectFirstKnownPlace()
 }
 
 /* Check if file specified by full path is exists*/

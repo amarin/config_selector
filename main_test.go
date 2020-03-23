@@ -1,6 +1,8 @@
 package config_selector
 
 import (
+	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -143,5 +145,231 @@ func TestConfigFileSelector_UseEtcProgramFolder(t *testing.T) {
 			}
 			break
 		}
+	}
+}
+
+type pathType int
+
+const (
+	isAbsPath pathType = iota
+	isRelPath
+	isJustName
+	isEmpty
+)
+
+type selectPathTestData struct {
+	name      string
+	path      pathType
+	cwdExists bool
+	cwdLookup bool
+	relExists bool
+	relLookup bool
+	want      *string
+	wantErr   bool
+}
+
+func (d selectPathTestData) String() string {
+	return fmt.Sprintf("cwd %v rel %v", d.cwdExists, d.relExists)
+}
+
+func TestConfigFileSelector_SelectFirstKnownPlace(t *testing.T) {
+	absPath, err := ioutil.TempFile("", "test*.conf")
+	if err != nil {
+		t.Fatalf("Cant create temp file for test: %v", err)
+	}
+	absFilePath := absPath.Name()
+	absFileName := filepath.Base(absFilePath)
+	absLookupPlace := LookupPlace(filepath.Dir(absFilePath))
+
+	absRelativePlace := LookupPlace(filepath.Dir(filepath.Dir(absFilePath)))
+	absRelativeName := filepath.Join(filepath.Base(filepath.Dir(absFilePath)), absFileName)
+
+	tests := []struct {
+		name        string
+		filename    string
+		lookupPlace *LookupPlace
+		exists      bool
+		want        *string
+		wantErr     bool
+	}{
+		{"no_lookup_places", absFileName, nil, false, nil, true},
+		{"missed", absFileName, &absLookupPlace, false, nil, true},
+		{"exists", absFileName, &absLookupPlace, true, &absFilePath, false},
+		{"relative/exists", absRelativeName, &absRelativePlace, true, &absFilePath, false},
+		{"relative/missed", absRelativeName, &absRelativePlace, false, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			searchFileName := tt.filename
+			if !tt.exists {
+				searchFileName += ".really.not.exists"
+			}
+			s := &ConfigFileSelector{
+				filename: searchFileName,
+			}
+			if tt.lookupPlace != nil {
+				s.AddLookupPlace(*tt.lookupPlace)
+			}
+			got, err := s.SelectFirstKnownPlace()
+			gotStr := "<nil>"
+			wantStr := "<nil>"
+			if got != nil {
+				gotStr = *got
+			}
+			if tt.want != nil {
+				wantStr = *tt.want
+			}
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SelectFirstKnownPlace()=(%v, %v), wantErr %v at %v", gotStr, err, tt.wantErr, s)
+				return
+			}
+			if gotStr != wantStr {
+				t.Fatalf("SelectFirstKnownPlace()=(%v, nil) != %v for exists %v with %v", gotStr, wantStr, searchFileName, s)
+			}
+		})
+	}
+}
+
+func TestConfigFileSelector_SelectPath(t *testing.T) {
+	baseFolder, err := ioutil.TempDir("", "sp")
+	if err != nil {
+		t.Fatalf("Cant create temp path test: %v", err)
+	}
+	absFolder, err := ioutil.TempDir(baseFolder, "existed")
+	if err != nil {
+		t.Fatalf("Cant create temp path for temp config: %v", err)
+	}
+	absPath, err := ioutil.TempFile(absFolder, "test*.conf")
+	if err != nil {
+		t.Fatalf("Cant create temp file for test: %v", err)
+	}
+	absFilePath := absPath.Name()
+	absFileName := filepath.Base(absFilePath)
+	cwdFolder, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Cant detect current work dir: %v", err)
+	}
+	cwdFilePath := filepath.Join(cwdFolder, absFileName)
+	relFolder, err := ioutil.TempDir(baseFolder, "rel")
+	if err != nil {
+		t.Fatalf("Cant create temp path for temp config: %v", err)
+	}
+	relFolderName := filepath.Base(relFolder)
+	relParent := filepath.Dir(relFolder)
+	relFilePath := filepath.Join(relFolder, absFileName)
+
+	tests := []selectPathTestData{
+		{
+			"empty", isEmpty,
+			false, true,
+			false, true,
+			nil, true,
+		},
+		{
+			"absolutePath", isAbsPath,
+			true, true,
+			true, true,
+			&absFilePath, false,
+		},
+		{
+			"./existed", isJustName,
+			true, true,
+			false, true,
+			&cwdFilePath, false,
+		},
+		{
+			"rel/missed", isRelPath,
+			true, true,
+			false, false,
+			nil, true,
+		},
+		{
+			"rel/existed", isRelPath,
+			true, true,
+			true, true,
+			&relFilePath, false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewConfigFileSelector(absFileName)
+			// remove old files
+			if exists, err := s.IsFileExists(cwdFilePath); err != nil {
+				t.Fatalf("Cant check if %v exists in cwd %s", absFileName, cwdFolder)
+			} else if exists {
+				if err := os.Remove(cwdFilePath); err != nil {
+					t.Fatalf("Cant remove cwd link %s", cwdFilePath)
+				}
+			}
+			if exists, err := s.IsFileExists(relFilePath); err != nil {
+				t.Fatalf("Cant check if %v exists in %s", absFileName, relFolder)
+			} else if exists {
+				if err := os.Remove(relFilePath); err != nil {
+					t.Fatalf("Cant remove cwd link %s", relFilePath)
+				}
+			}
+			// add lookup places if required
+			if tt.cwdLookup {
+				s.AddLookupPlace(LookupPlace(cwdFolder))
+			}
+			if tt.relLookup {
+				s.AddLookupPlace(LookupPlace(relParent))
+			}
+			// make cwd & rel files if required
+			if tt.cwdExists {
+				if err := os.Symlink(absFilePath, cwdFilePath); err != nil {
+					t.Fatalf("Cant symlink test config to cwd %v", cwdFolder)
+				}
+			}
+			if tt.relExists {
+				if err := os.Symlink(absFilePath, relFilePath); err != nil {
+					t.Fatalf("Cant symlink test config to %v", relFolder)
+				}
+			}
+			var got *string
+			var err error
+			var selectPath string
+
+			switch tt.path {
+			case isEmpty:
+				selectPath = ""
+			case isAbsPath:
+				selectPath = absFilePath
+			case isJustName:
+				selectPath = absFileName
+			case isRelPath:
+				selectPath = filepath.Join(relFolderName, absFileName)
+			}
+			got, err = s.SelectPath(selectPath)
+			gotStr := "<nil>"
+			wantStr := "<nil>"
+			if got != nil {
+				gotStr = *got
+			}
+			if tt.want != nil {
+				wantStr = *tt.want
+			}
+			if tt.wantErr && err == nil {
+				t.Errorf("SelectPath(%#v) = (%v, %v) for %v with %v", selectPath, gotStr, err, tt, s)
+			}
+
+			if gotStr != wantStr {
+				t.Errorf("SelectPath(%v)=(%v, %v) != %v for %v with %v", selectPath, gotStr, err, wantStr, tt, s)
+			}
+			if exists, err := s.IsFileExists(cwdFilePath); err != nil {
+				t.Fatalf("Cant check if %v exists in cwd %s", absFileName, cwdFolder)
+			} else if exists {
+				if err := os.Remove(cwdFilePath); err != nil {
+					t.Fatalf("Cant remove cwd link %s", cwdFilePath)
+				}
+			}
+			if exists, err := s.IsFileExists(relFilePath); err != nil {
+				t.Fatalf("Cant check if %v exists in %s", absFileName, relFolder)
+			} else if exists {
+				if err := os.Remove(relFilePath); err != nil {
+					t.Fatalf("Cant remove cwd link %s", relFilePath)
+				}
+			}
+		})
 	}
 }
