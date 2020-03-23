@@ -28,12 +28,12 @@ const (
 type LookupPlacesList []LookupPlace
 
 // LookupPlacesList has it's own String method, it useful to output lookup places list, separated by comma's
-func (s *LookupPlacesList) String() string {
+func (s LookupPlacesList) String() string {
 	var placesStr []string
-	for _, p := range *s {
+	for _, p := range s {
 		placesStr = append(placesStr, string(p))
 	}
-	return strings.Join(placesStr, ", ")
+	return strings.Join(placesStr, ",")
 }
 
 // ConfigFileSelector is an a helper object.
@@ -54,7 +54,7 @@ type ConfigFileSelector struct {
 // ConfigFileSelector instance implements Stringer interface:
 //
 // configSelector.String() == "ConfigFileSelector{filename.conf, [./, Home]}
-func (s *ConfigFileSelector) String() string {
+func (s ConfigFileSelector) String() string {
 	return fmt.Sprintf("ConfigFileSelector{%v, [%v]}", s.filename, s.lookupPlacesList.String())
 }
 

@@ -373,3 +373,47 @@ func TestConfigFileSelector_SelectPath(t *testing.T) {
 		})
 	}
 }
+
+func TestLookupPlacesList_String(t *testing.T) {
+	tests := []struct {
+		name string
+		s    LookupPlacesList
+		want string
+	}{
+		{"empty", LookupPlacesList{}, ""},
+		{"home", LookupPlacesList{HomeDir}, fmt.Sprintf("%s", HomeDir)},
+		{"etc", LookupPlacesList{Etc}, fmt.Sprintf("%s", Etc)},
+		{"home,etc", LookupPlacesList{HomeDir, Etc}, fmt.Sprintf("%s,%s", HomeDir, Etc)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.s.String(); got != tt.want {
+				t.Errorf("String() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConfigFileSelector_GetLookupPlaces_String(t *testing.T) {
+	tests := []struct {
+		name string
+		s    LookupPlacesList
+		want string
+	}{
+		{"empty", LookupPlacesList{}, ""},
+		{"home", LookupPlacesList{HomeDir}, fmt.Sprintf("%s", HomeDir)},
+		{"etc", LookupPlacesList{Etc}, fmt.Sprintf("%s", Etc)},
+		{"home,etc", LookupPlacesList{HomeDir, Etc}, fmt.Sprintf("%s,%s", HomeDir, Etc)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs := NewConfigFileSelector("any")
+			for _, lp := range tt.s {
+				cs.AddLookupPlace(lp)
+			}
+			if got := fmt.Sprintf("%s", cs.GetLookupPlaces()); got != tt.want {
+				t.Errorf("String() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
