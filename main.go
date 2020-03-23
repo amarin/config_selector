@@ -147,7 +147,7 @@ func (s *ConfigFileSelector) LookupFilePathList() (*[]string, error) {
 	return &ret, nil
 }
 
-/* Get first existing configuration file path from places set by lookup flags */
+/* Get first existing configuration file path from added lookup places */
 func (s *ConfigFileSelector) SelectFirstKnownPlace() (*string, error) {
 	// get first existing configuration file path using possible configuration file path list
 	knownPathList, err := s.LookupFilePathList()
@@ -164,17 +164,21 @@ func (s *ConfigFileSelector) SelectFirstKnownPlace() (*string, error) {
 	return nil, os.ErrNotExist
 }
 
-// Find configuration file in requested path first or in well known path list defined by lookup flags
-// return error if no such file found either in requested path or in well known path list.
-// Possible variants:
-// - empty path requested: search set (default) filename in defined lookup places, return first existed or error
-// - filename requested: search specified filename in defined lookup places, return first existed or error
-// - absolute path requested: return it (if exists) otherwise return error
+// Find configuration file in requested absolute or relative path.
+// Return error if no such file found.
+//
+// Possible configPath value cases:
+//
+// - empty string: search filename in defined lookup places only, return first existed or error
+// - absolute path: return it if exists or error
+// - relative filepath or just filename: search requested in defined lookup places, return first existed or error
 func (s *ConfigFileSelector) SelectPath(configPath string) (*string, error) {
+	// empty string
 	if configPath == "" {
 		// config path not set, looking for default
 		return s.SelectFirstKnownPlace()
 	}
+	// absolute path
 	if absConfigPath, err := filepath.Abs(configPath); err == nil && absConfigPath == configPath {
 		// take absolute path error, cant deal with that
 		if exists, err := s.IsFileExists(absConfigPath); err == nil && exists {
@@ -182,7 +186,7 @@ func (s *ConfigFileSelector) SelectPath(configPath string) (*string, error) {
 			return &absConfigPath, err // err==nil
 		}
 	}
-	// filename or relative path, search in defined lookup places but with specified name
+	// relative filepath, search in defined lookup places but with specified name
 	s.filename = configPath
 	return s.SelectFirstKnownPlace()
 }
